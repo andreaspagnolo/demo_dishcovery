@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+**/*.py[cod]
+.venv/
+venv/
+
+# Local secrets
+.env
+.hf_token
+
+# Runtime outputs
+demo_runs/
+reports/
+outputs/
+embeddings/
+
+# Local model assets
+models/
+checkpoints/
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.bin
+
+# External image folders
+dataset/MM-Food-100K-images-filtered/
+dataset/food500_subset/images/
+
+# OS/editor noise
+.DS_Store
