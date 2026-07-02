@@ -159,13 +159,15 @@ The exact model IDs used by the demo are:
 | Task 1 SigLIP2 visual/text recall | `timm/ViT-gopt-16-SigLIP2-384` through OpenCLIP as `hf-hub:timm/ViT-gopt-16-SigLIP2-384` |
 | Task 1 Qwen visual selection | `Qwen/Qwen3-VL-4B-Instruct` |
 | Task 2 caption recall | `timm/ViT-gopt-16-SigLIP2-384` |
+| Task 2 guarded reranker | `Qwen/Qwen3-VL-Reranker-2B` |
 | Calorie composition estimation | `Qwen/Qwen3-VL-4B-Instruct` |
 | Browser voice commands | `base.en` through `faster-whisper`, cached as `Systran/faster-whisper-base.en` |
 | Optional TTS | Piper voice `en_US-lessac-medium` |
 
-The web demo does not use the Qwen reranker models. `orin_task2_demo.py`
-contains reranker code for experiments, but `demo/task_router.py` runs Task 2
-with `--final-score-mode siglip`.
+Task 2 now defaults to guarded scoring: it keeps the SigLIP2 top result for
+easy images and runs `Qwen/Qwen3-VL-Reranker-2B` only for ambiguous images.
+This is wired through `demo/task_router.py` with `--final-score-mode
+siglip_guarded`.
 
 ### 5.1 Download All Runtime Models
 
@@ -180,7 +182,7 @@ export HF_HUB_CACHE="$HF_HOME/hub"
 mkdir -p "$HF_HOME" "$HF_HUB_CACHE"
 ```
 
-Download the SigLIP2, Qwen3-VL, and faster-whisper models:
+Download the default runtime models used by the web demo:
 
 ```bash
 python - <<'PY'
@@ -205,6 +207,13 @@ snapshot_download(
     repo_id="Systran/faster-whisper-base.en",
 )
 PY
+```
+
+Download the Task 2 reranker used by the default guarded-scoring path:
+
+```bash
+hf download Qwen/Qwen3-VL-Reranker-2B \
+    --local-dir ./Qwen3-VL-Reranker-2B
 ```
 
 Install Piper and download the optional voice files used by `demo_web_app.py`:

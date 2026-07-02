@@ -19,7 +19,7 @@ TASK1_SCRIPT = ROOT / "orin_demo.py"
 TASK2_SCRIPT = ROOT / "orin_task2_demo.py"
 CALORIE_SCRIPT = ROOT / "orin_calorie_demo.py"
 TASK1_SKIP_VLM_REL_GAP_THRESHOLD = 0.25
-TASK2_FINAL_SCORE_MODE = "siglip"
+TASK2_FINAL_SCORE_MODE = "siglip_guarded"
 
 
 @dataclass
@@ -55,9 +55,9 @@ class TaskRouter:
                 self._load_task1_runtime()
                 notify("SigLIP2 and Qwen-VL-Instruct-4B ready")
             elif normalized in {"task2", "task2_fast"}:
-                notify("Preparing SigLIP2 caption recall")
+                notify("Loading SigLIP2 caption recall and Qwen-VL-Reranker-2B")
                 self._load_task2_runtime()
-                notify("SigLIP2 caption recall ready")
+                notify("SigLIP2 caption recall and Qwen-VL-Reranker-2B ready")
             elif normalized in {"calorie", "calories"}:
                 notify("Preparing calorie backend with SigLIP2 and Qwen-VL-Instruct-4B")
                 self._load_calorie_runtime()
@@ -591,8 +591,17 @@ class WarmTask2Runtime:
         self.caption_embeddings, self.caption_cache = module.load_or_build_caption_embeddings(self.embedder, self.caption_bank, args)
         self.caption_embeddings_sec = time.perf_counter() - started
         self.reranker = None
-        self.reranker_mode = "skipped_siglip_final_score"
-        self.load_reranker_sec = 0.0
+        started = time.perf_counter()
+        if args.mock_reranker or args.final_score_mode == "siglip":
+            self.reranker_mode = "mock_siglip_scores" if args.mock_reranker else "skipped_siglip_final_score"
+        else:
+            self.reranker = module.QwenVLCaptionReranker(args, self.hf_token)
+            self.reranker_mode = (
+                args.reranker_model
+                if args.final_score_mode != "siglip_guarded"
+                else f"siglip_guarded:{args.reranker_model}"
+            )
+        self.load_reranker_sec = time.perf_counter() - started
 
     def run_one(self, image_path: Path) -> dict[str, Any]:
         args = self.args
@@ -604,8 +613,24 @@ class WarmTask2Runtime:
         siglip_image_and_recall_sec = time.perf_counter() - started
 
         started = time.perf_counter()
-        for candidate in candidates:
-            candidate.rerank_score = candidate.siglip_score
+        rerank_applied = False
+        rerank_skipped_by_siglip_guard = 0
+        rerank_pair_count = 0
+        if args.mock_reranker or args.final_score_mode == "siglip":
+            for candidate in candidates:
+                candidate.rerank_score = candidate.siglip_score
+        elif args.final_score_mode == "siglip_guarded" and self.m.siglip_is_confident(candidates, args):
+            rerank_skipped_by_siglip_guard = 1
+        else:
+            if self.reranker is None:
+                raise RuntimeError("Reranker was not initialized")
+            pair_paths = [image_path for _ in candidates]
+            pair_texts = [candidate.text for candidate in candidates]
+            rerank_pair_count = len(pair_paths)
+            rerank_scores = self.reranker.score_pairs(pair_paths, pair_texts, args.reranker_batch_size)
+            for candidate, score in zip(candidates, rerank_scores):
+                candidate.rerank_score = score
+            rerank_applied = True
         rerank_sec = time.perf_counter() - started
 
         started = time.perf_counter()
@@ -642,7 +667,7 @@ class WarmTask2Runtime:
             "siglip_top1_caption_correct": None,
             "truth_caption_in_candidates": None,
             "siglip_top_gap": self.m.siglip_top_gap(candidates),
-            "rerank_applied": False,
+            "rerank_applied": rerank_applied,
             "timings_sec": {
                 "siglip_image_and_recall_sec": siglip_image_and_recall_sec,
                 "rerank_sec": rerank_sec,
@@ -684,8 +709,8 @@ class WarmTask2Runtime:
             "metrics": {
                 "rows": 1,
                 "metric_available": False,
-                "rerank_pair_count": 0,
-                "rerank_skipped_by_siglip_guard": 0,
+                "rerank_pair_count": rerank_pair_count,
+                "rerank_skipped_by_siglip_guard": rerank_skipped_by_siglip_guard,
             },
             "traces": [trace],
         }

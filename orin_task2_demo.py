@@ -34,11 +34,11 @@ DEFAULT_EVALUATION_JSON = ROOT / "labels/evaluation_data.json"
 DEFAULT_OUTPUT_DIR = ROOT / "reports/orin_task2_caption_reranker"
 DEFAULT_SIGLIP_MODEL = "hf-hub:timm/ViT-gopt-16-SigLIP2-384"
 DEFAULT_SIGLIP_PRETRAINED = ""
-DEFAULT_RERANKER_SIZE = "8B"
-DEFAULT_RERANKER_MODEL = "Qwen/Qwen3-VL-Reranker-8B"
+DEFAULT_RERANKER_SIZE = "2B"
+DEFAULT_RERANKER_MODEL = "Qwen/Qwen3-VL-Reranker-2B"
 RERANKER_MODEL_BY_SIZE = {
     "2B": "Qwen/Qwen3-VL-Reranker-2B",
-    "8B": DEFAULT_RERANKER_MODEL,
+    "8B": "Qwen/Qwen3-VL-Reranker-8B",
 }
 RERANKER_REQUIRED_FILES = ("config.json", "modules.json", "tokenizer.json")
 CAPTION_CACHE_VERSION = "orin_task2_siglip2_caption_bank_v1"
@@ -148,7 +148,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--final-score-mode",
         choices=("rerank", "siglip", "blend_z", "siglip_guarded"),
-        default="rerank",
+        default="siglip_guarded",
         help=(
             "How to choose the final caption. siglip_guarded keeps SigLIP top-1 "
             "when it is confident and uses Qwen only for ambiguous images."
