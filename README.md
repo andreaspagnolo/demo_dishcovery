@@ -9,7 +9,8 @@ The demo exposes one web UI for:
 
 - Task 1: multi-label ingredient recognition with SigLIP2 candidate recall and
   Qwen3-VL visual selection.
-- Task 2: image-to-caption retrieval with SigLIP2 caption recall.
+- Task 2: image-to-caption retrieval with SigLIP2 caption recall and
+  Qwen3-VL-Reranker-2B guarded re-ranking for ambiguous images.
 - Calorie estimation with Qwen3-VL dish-composition parsing and a local calorie
   table.
 - Browser image input through dataset samples, upload, or camera capture.
